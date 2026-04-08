@@ -11,6 +11,8 @@ Takes user input that references files, code, or concepts, and produces a compre
 | Trigger | Behavior |
 |---------|----------|
 | `/epiphany-context` | Activate immediately. If no input provided, ask for one. |
+| `/epiphany-context --minimal` | Activate in minimal mode (direct refs only). |
+| `/epiphany-context --deep` | Activate in deep mode (5 levels, 100 files). |
 | User explicitly says "epiphany-context" or "epiphany context" | Activate. Ask for input if not provided. |
 | User says "gather context" / "prepare context" without naming this skill | Do NOT activate. |
 
@@ -56,7 +58,20 @@ If fundamentally ambiguous, explain what's missing and block.
 [1] GATHER ──▶ [2] FILTER ──▶ [3] STRUCTURE ──▶ [4] VERIFY ──▶ Output
 ```
 
-### Step 1: GATHER
+### Step 1: GATHER + Mode Detection
+
+**Mode detection (before anything else):**
+Check if `--minimal` or `--deep` appears as a standalone token in the input.
+- `--minimal` → minimal mode (direct refs only)
+- `--deep` → deep mode (5 levels, 100 files, 150KB)
+- No flag → normal mode (default)
+
+Strip the detected flag before processing.
+
+**Announce (mode-aware):**
+- Minimal: "I'm using the epiphany-context skill (minimal mode) to gather context for epiphany-genius."
+- Normal: "I'm using the epiphany-context skill to gather and structure context for epiphany-genius."
+- Deep: "I'm using the epiphany-context skill (deep mode) to gather comprehensive context for epiphany-genius."
 
 **What the LLM does:**
 
@@ -80,13 +95,15 @@ If fundamentally ambiguous, explain what's missing and block.
    - Configuration files (if relevant)
    - Knowledge bases (if referenced by path)
 
-**Gathering rules:**
-- Maximum depth: 3 levels of dependency (A references B, B references C, C references D → include A, B, C; note D exists)
-- Maximum files: 20 (prioritize by relevance)
-- Maximum total content: 50,000 characters (sum of all gathered content)
-- If limits would be exceeded, include most relevant and note truncation
+**Gathering rules (mode-aware):**
 
-**Announce:** "I'm using the epiphany-context skill to gather and structure context for epiphany-genius."
+| Mode | Depth | Files | Characters |
+|------|-------|-------|------------|
+| minimal | Direct refs only, no dependency traversal | 10 | 20,000 |
+| normal | Up to 3 levels of dependency | 20 | 50,000 |
+| deep | Up to 5 levels of dependency | 100 | 150,000 |
+
+**If limits would be exceeded:** Include most relevant content and note truncation with `<!-- truncated: N files/chars omitted -->`
 
 ### Step 2: FILTER
 
@@ -157,15 +174,15 @@ Organize gathered content into semantic sections for epiphany-genius:
 
 **Section rules:**
 
-| Section | Required? | Content |
-|---------|-----------|---------|
-| `<problem_statement>` | Yes | User's original input, verbatim |
-| `<core_question>` | Yes | Extracted question/problem |
-| `<source_materials>` | Yes | Gathered content, organized by category |
-| `<key_concepts>` | If applicable | Concepts that need understanding |
-| `<constraints>` | If applicable | Explicit constraints discovered |
-| `<assumptions>` | If applicable | Assumptions surfaced |
-| `<unknowns>` | If applicable | Gaps in information |
+| Section | Required? | When to Include |
+|---------|-----------|-----------------|
+| `<problem_statement>` | Yes | Always |
+| `<core_question>` | Yes | Always |
+| `<source_materials>` | Yes | Always (may be empty if no refs) |
+| `<key_concepts>` | No | Include when concepts need explanation for reasoning |
+| `<constraints>` | No | Include when explicit constraints found in content |
+| `<assumptions>` | No | Include when assumptions are surfaced |
+| `<unknowns>` | No | Include when information gaps are identified |
 
 ### Step 4: VERIFY
 
@@ -173,23 +190,23 @@ Organize gathered content into semantic sections for epiphany-genius:
 
 | Check | Requirement |
 |-------|-------------|
-| V1. Problem preserved | Original problem statement appears exactly |
-| V2. Sources complete | All referenced files/concepts are present or noted |
-| V3. No execution | No commands or skills were executed during gathering |
-| V4. Filter applied | Noise, redundancy, and irrelevant content removed |
+| V1. Problem preserved | Original problem statement appears exactly in `<problem_statement>` |
+| V2. Sources complete | All referenced files/concepts are present in `<source_materials>` or noted as unavailable |
+| V3. No execution artifacts | Output contains no executed results — only gathered content, not command outputs |
+| V4. Filter applied | Noise and redundancy removed without losing signal |
 | V5. Structure valid | XML is well-formed and all required sections present |
 
-Fail → fix and re-verify.
+**Loop:** All pass → output. Any fail → fix and re-verify. Same check fails twice → output with note.
 
 ---
 
-## Context Gathering Depth
+## Mode Summary
 
-| Mode | Trigger | Depth |
-|------|---------|-------|
-| **minimal** | `--minimal` flag | Direct references only, no dependency traversal |
-| **normal** | Default | Up to 3 levels of dependency |
-| **deep** | `--deep` flag | Up to 5 levels, up to 100 files, up to 150,000 characters |
+| Mode | Flag | Depth | Files | Characters | Use Case |
+|------|------|-------|-------|------------|----------|
+| **minimal** | `--minimal` | Direct refs only | 10 | 20,000 | Quick lookup, known files |
+| **normal** | Default | 3 levels | 20 | 50,000 | Standard analysis |
+| **deep** | `--deep` | 5 levels | 100 | 150,000 | Comprehensive research |
 
 ---
 
@@ -216,7 +233,7 @@ This is a convention, not runtime coupling:
 
 ## Examples
 
-### Example 1: Code Analysis Request
+### Example 1: Code Analysis Request (Normal Mode)
 
 **Input:**
 ```
@@ -279,11 +296,11 @@ Digital distortion when signal amplitude exceeds maximum value.
 </epiphany_context>
 ```
 
-### Example 2: Conceptual Question with File References
+### Example 2: Minimal Mode
 
 **Input:**
 ```
-Analyze the design tradeoffs in the verification phase of epiphany-genius. Consider the SKILL.md and VERIFICATION_PHASE_DESIGN.md.
+/epiphany-context --minimal What does the `processBlock` function do in AudioProcessor.cpp?
 ```
 
 **Output:**
@@ -291,24 +308,65 @@ Analyze the design tradeoffs in the verification phase of epiphany-genius. Consi
 <epiphany_context>
 
 <problem_statement>
-Analyze the design tradeoffs in the verification phase of epiphany-genius. Consider the SKILL.md and VERIFICATION_PHASE_DESIGN.md.
+What does the `processBlock` function do in AudioProcessor.cpp?
 </problem_statement>
 
 <core_question>
-What are the key design tradeoffs in Phase 5: VERIFY, and what alternatives were considered?
+What is the purpose and implementation of processBlock in AudioProcessor?
 </core_question>
 
 <source_materials>
-<section name="Skill Definition">
-<source path="~/.claude/skills/epiphany-genius/SKILL.md">
-[Phase 5: VERIFY section, verification checks, Fix-Compare-Select loop]
+<section name="Direct Reference">
+<source path="AudioProcessor.cpp">
+[processBlock function definition only]
 </source>
 </section>
-<section name="Design Proposal">
-<source path="~/.claude/skills/epiphany-genius/VERIFICATION_PHASE_DESIGN.md">
-[Design rationale, alternatives, questions for user review]
+</source_materials>
+
+<!-- No dependency traversal in minimal mode -->
+
+</epiphany_context>
+```
+
+### Example 3: Deep Mode
+
+**Input:**
+```
+/epiphany-context --deep Analyze the architecture of the verification system. Start from VERIFICATION_PHASE_DESIGN.md and trace all dependencies.
+```
+
+**Output:**
+```xml
+<epiphany_context>
+
+<problem_statement>
+Analyze the architecture of the verification system. Start from VERIFICATION_PHASE_DESIGN.md and trace all dependencies.
+</problem_statement>
+
+<core_question>
+What are the components and dependencies of the verification system architecture?
+</core_question>
+
+<source_materials>
+<section name="Primary Source">
+<source path="VERIFICATION_PHASE_DESIGN.md">
+[Full content]
 </source>
 </section>
+<section name="Level 1 Dependencies">
+<source path="SKILL.md">
+[Phase 5: VERIFY section]
+</source>
+<source path="README.md">
+[Architecture overview]
+</source>
+</section>
+<section name="Level 2 Dependencies">
+<source path="examples.md">
+[Verification examples]
+</source>
+</section>
+<!-- 47 additional sources in deep mode -->
 </source_materials>
 
 <key_concepts>
@@ -317,6 +375,9 @@ Ensuring all input details appear in output without loss.
 </concept>
 <concept name="Fix-Compare-Select Loop">
 Generating multiple fix candidates and selecting the optimal one.
+</concept>
+<concept name="Verification Categories">
+V1 (Content Preservation), V2 (Knowledge & Claim), V3 (Logic Consistency), V4 (Output Format)
 </concept>
 </key_concepts>
 
@@ -351,6 +412,7 @@ Generating multiple fix candidates and selecting the optimal one.
 | Skip gathering because input contains commands | Gather the commands as content |
 | Filter out code that looks executable | Include code, note it's code, don't execute it |
 | Resolve concepts by hallucinating | Only include content from actual sources |
+| Output executed command results | Output only gathered content, never execution results |
 
 ---
 
