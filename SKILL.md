@@ -1,4 +1,4 @@
-# Epiphany Prompt
+# Epiphany Context
 
 **Context preparation skill for epiphany-genius.**
 
@@ -10,8 +10,8 @@ Takes user input that references files, code, or concepts, and produces a compre
 
 | Trigger | Behavior |
 |---------|----------|
-| `/epiphany-prompt` | Activate immediately. If no input provided, ask for one. |
-| User explicitly says "epiphany-prompt" or "epiphany prompt" | Activate. Ask for input if not provided. |
+| `/epiphany-context` | Activate immediately. If no input provided, ask for one. |
+| User explicitly says "epiphany-context" or "epiphany context" | Activate. Ask for input if not provided. |
 | User says "gather context" / "prepare context" without naming this skill | Do NOT activate. |
 
 **No auto-activation.** Must be explicitly invoked.
@@ -86,7 +86,7 @@ If fundamentally ambiguous, explain what's missing and block.
 - Maximum total content: 50,000 characters (sum of all gathered content)
 - If limits would be exceeded, include most relevant and note truncation
 
-**Announce:** "I'm using the epiphany-prompt skill to gather and structure context for epiphany-genius."
+**Announce:** "I'm using the epiphany-context skill to gather and structure context for epiphany-genius."
 
 ### Step 2: FILTER
 
@@ -198,18 +198,18 @@ Fail → fix and re-verify.
 **This skill prepares context. epiphany-genius reasons about it.**
 
 **Workflow:**
-1. User runs `/epiphany-prompt` with problem statement
+1. User runs `/epiphany-context` with problem statement
 2. This skill gathers and structures context
 3. User runs `/epiphany-genius` with the structured context
 4. epiphany-genius applies its 5-phase reasoning pipeline
 
 **Composition pattern:**
 
-Any skill can document: *"For complex problems requiring deep reasoning, run `/epiphany-prompt` first to gather context, then pass its output to `/epiphany-genius`."*
+Any skill can document: *"For complex problems requiring deep reasoning, run `/epiphany-context` first to gather context, then pass its output to `/epiphany-genius`."*
 
 This is a convention, not runtime coupling:
-- epiphany-prompt does NOT import, reference, or modify any other skill
-- epiphany-genius does NOT require epiphany-prompt
+- epiphany-context does NOT import, reference, or modify any other skill
+- epiphany-genius does NOT require epiphany-context
 - The agent orchestrates the handoff in its own response flow
 
 ---
