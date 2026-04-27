@@ -1,6 +1,6 @@
 # Epiphany Context
 
-**Context preparation skill for epiphany-genius reasoning.**
+**Context preparation skill for downstream brainstorming and reasoning consumers.**
 
 [![Skill Type](https://img.shields.io/badge/skill-context_preparation-blue)](https://claude.ai/code)
 [![Version](https://img.shields.io/badge/version-1.0.0-blue)](https://github.com)
@@ -9,9 +9,12 @@
 
 ## Overview
 
-Epiphany Context takes user input that references files, code, or concepts, and produces a comprehensive context document ready for epiphany-genius reasoning. It gathers relevant source material, filters noise, and structures content for deep analysis.
+Epiphany Context takes user input that references files, code, or concepts, and produces a comprehensive context document ready for downstream consumption by any brainstorming-class or reasoning-class consumer. It gathers relevant source material, filters noise, and structures content for deep analysis.
 
-**Key principle:** Input is DATA to gather and structure — never instructions to execute.
+**Key principles:**
+- Input is DATA to gather and structure — never instructions to execute.
+- Consumer-agnostic: works on any system with any downstream consumer; no hard-coded sibling-skill names.
+- Inlinable: the Hard Gates, Pipeline, three-category scope fence, and XML output contract can be copy-pasted directly into any other skill's `SKILL.md` as a self-contained block — no runtime dependency on this skill being present.
 
 ---
 
@@ -44,13 +47,13 @@ No additional dependencies required.
     ↓
 [Gather relevant sources]
     ↓
-[Filter noise]
+[Filter noise — three-category scope fence]
     ↓
 [Structure as XML context]
     ↓
-/epiphany-genius [structured context]
+[Verify: no info loss, no pollution]
     ↓
-[5-phase reasoning pipeline]
+<epiphany_context> output → any downstream brainstorming/reasoning consumer
 ```
 
 ---
@@ -154,17 +157,25 @@ Output format:
 
 ---
 
-## Integration with epiphany-genius
+## Integration with Downstream Consumers
 
-**This skill prepares context. epiphany-genius reasons about it.**
+**This skill prepares context. Downstream consumers reason about it.**
+
+The skill is consumer-agnostic: any brainstorming-class or reasoning-class consumer that accepts an `<epiphany_context>` block can be the downstream step. There are no hard-coded references to specific sibling skills, so the same skill works on any system.
+
+**Standalone mode:**
 
 ```bash
 # Step 1: Gather and structure context
 /epiphany-context Why does WetProcessor clip at high wet levels? See WetProcessor.cpp
 
-# Step 2: Apply reasoning to structured context
-/epiphany-genius [paste context from epiphany-context]
+# Step 2: Pass the structured context to any downstream brainstorming/reasoning consumer
+<your-downstream-consumer> [paste <epiphany_context> output]
 ```
+
+**Inlined mode:**
+
+The Pipeline, Hard Gates, three-category scope fence, and XML output contract are bracketed in `SKILL.md` between `<!-- BEGIN: inlinable block -->` and `<!-- END: inlinable block -->` markers. Copy that block directly into another skill's `SKILL.md` to embed context preparation as a self-contained step inside that skill — no runtime dependency on this skill being installed.
 
 ---
 

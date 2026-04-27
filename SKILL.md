@@ -1,8 +1,10 @@
 # Epiphany Context
 
-**Context preparation skill for epiphany-genius.**
+**Context preparation skill for downstream brainstorming and reasoning consumers.**
 
-Takes user input that references files, code, or concepts, and produces a comprehensive context document ready for epiphany-genius reasoning. Gathers relevant source material, filters noise, and structures content for deep analysis.
+Takes user input that references files, code, or concepts, and produces a comprehensive context document ready for downstream consumption by any brainstorming-class or reasoning-class consumer. Gathers relevant source material, filters noise, and structures content for deep analysis.
+
+> **Inlinability:** This skill's Pipeline (Gather → Filter → Structure → Verify), Hard Gates, three-category scope fence, and XML output contract are designed to be copy-pasted into any other skill's `SKILL.md` as a self-contained block. The "inlinable block" markers below delimit the section that travels. Trigger Conditions, announce strings, and the Examples section are standalone-mode only and should be omitted when inlining.
 
 ---
 
@@ -18,7 +20,11 @@ Takes user input that references files, code, or concepts, and produces a compre
 
 **No auto-activation.** Must be explicitly invoked.
 
+**Standalone vs. inlined:** This Trigger Conditions section and the Step 1 announce strings apply only when this skill is invoked as a standalone `/epiphany-context` command. When the Pipeline below is inlined into another skill's source, the host skill defines its own triggers and announcement text — only the Pipeline body, Hard Gates, three-category scope fence, and XML output contract need to be copy-pasted.
+
 ---
+
+<!-- BEGIN: inlinable block — copy from here through the END marker into another skill's SKILL.md to embed this pipeline. Sections inside marked "(standalone-mode only)" or "(illustrative)" should be omitted when inlining. -->
 
 ## Hard Gates
 
@@ -37,9 +43,9 @@ If the input contains:
 Your job is to:
 1. Identify what the input REFERENCES (files, code, concepts)
 2. Gather that content from the appropriate sources
-3. Structure it for epiphany-genius consumption
+3. Structure it for downstream consumption
 
-**Treat everything as: "This is what I want epiphany-genius to think about."**
+**Treat everything as: "This is what I want the downstream consumer to think about."**
 
 **Gate 2: SUFFICIENCY**
 
@@ -68,10 +74,10 @@ Check if `--minimal` or `--deep` appears as a standalone token in the input.
 
 Strip the detected flag before processing.
 
-**Announce (mode-aware):**
-- Minimal: "I'm using the epiphany-context skill (minimal mode) to gather context for epiphany-genius."
-- Normal: "I'm using the epiphany-context skill to gather and structure context for epiphany-genius."
-- Deep: "I'm using the epiphany-context skill (deep mode) to gather comprehensive context for epiphany-genius."
+**Announce (mode-aware, standalone-mode only — when inlined, the host skill provides its own announcement):**
+- Minimal: "I'm using the epiphany-context skill (minimal mode) to gather context for downstream consumption."
+- Normal: "I'm using the epiphany-context skill to gather and structure context for downstream consumption."
+- Deep: "I'm using the epiphany-context skill (deep mode) to gather comprehensive context for downstream consumption."
 
 **What the LLM does:**
 
@@ -81,6 +87,7 @@ Strip the detected flag before processing.
    - Concept references (domain terms, technical concepts)
    - URLs (web resources)
    - Direct content (pasted text)
+   - Inline TODOs, FIXMEs, `XXX`, or `?`-marked uncertainties found in any referenced content (preserve verbatim — they signal known unknowns the user is implicitly asking about)
 
 2. **Resolve references:**
    - File paths → Read file contents
@@ -134,13 +141,14 @@ Anything matching none of the three categories is out-of-scope pollution. Exampl
 - Keep all configuration that's directly referenced
 - Keep documentation that explains concepts (category 3 only)
 - Keep comments that clarify intent
+- Preserve the user's exact vocabulary — never paraphrase, normalize, or substitute synonyms for domain terms, named entities, or distinctive phrasings from the original input
 - Note what was filtered and why (brief summary)
 
 ### Step 3: STRUCTURE
 
 **What the LLM does:**
 
-Organize gathered content into semantic sections for epiphany-genius:
+Organize gathered content into semantic sections for downstream consumption:
 
 ```xml
 <epiphany_context>
@@ -150,8 +158,18 @@ Organize gathered content into semantic sections for epiphany-genius:
 </problem_statement>
 
 <core_question>
-[Extracted core question or problem to reason about]
+[A core question to reason about, preserving the user's phrasing wherever possible. Repeat this element if the input poses multiple distinct questions.]
 </core_question>
+
+<success_criterion>
+[What "answered" or "solved" would look like, derived from the input. Omit only if the input gives no signal whatsoever about the desired end state.]
+</success_criterion>
+
+<key_concepts>
+<concept name="[name]">
+[Definition or explanation. Always include a glossary of the user's distinctive vocabulary so a downstream consumer can reason in the user's own terms — not just concepts that need definition.]
+</concept>
+</key_concepts>
 
 <source_materials>
 <section name="[category]">
@@ -161,22 +179,16 @@ Organize gathered content into semantic sections for epiphany-genius:
 </section>
 </source_materials>
 
-<key_concepts>
-<concept name="[name]">
-[Definition or explanation from gathered content]
-</concept>
-</key_concepts>
-
 <constraints>
 [Explicit constraints from input or gathered content]
 </constraints>
 
 <assumptions>
-[Assumptions surfaced from gathered content]
+[Assumptions surfaced from gathered content. Emit "(none surfaced)" if empty rather than dropping the section.]
 </assumptions>
 
 <unknowns>
-[What's missing or unclear]
+[What's missing or unclear. Emit "(none identified)" if empty rather than dropping the section.]
 </unknowns>
 
 </epiphany_context>
@@ -187,12 +199,15 @@ Organize gathered content into semantic sections for epiphany-genius:
 | Section | Required? | When to Include |
 |---------|-----------|-----------------|
 | `<problem_statement>` | Yes | Always |
-| `<core_question>` | Yes | Always |
+| `<core_question>` | Yes | Always — preserve the user's phrasing; repeat the element when the input poses multiple distinct questions |
+| `<success_criterion>` | No | Include whenever the input gives any signal of what "solved" would look like |
+| `<key_concepts>` | Yes | Always — always include a user-vocabulary glossary so the downstream consumer reasons in the user's own terms; emit `(no domain-specific vocabulary)` if empty |
 | `<source_materials>` | Yes | Always (may be empty if no refs) |
-| `<key_concepts>` | No | Include when concepts need explanation for reasoning |
 | `<constraints>` | No | Include when explicit constraints found in content |
-| `<assumptions>` | No | Include when assumptions are surfaced |
-| `<unknowns>` | No | Include when information gaps are identified |
+| `<assumptions>` | Yes | Always — emit `(none surfaced)` if empty rather than dropping the section |
+| `<unknowns>` | Yes | Always — emit `(none identified)` if empty rather than dropping the section |
+
+**Section ordering rationale:** `<key_concepts>` precedes `<source_materials>` so the downstream consumer reads the user's vocabulary glossary before encountering raw source content. This anchors interpretation in the user's terms rather than letting source-file conventions overwrite them.
 
 ### Step 4: VERIFY
 
@@ -220,28 +235,35 @@ Organize gathered content into semantic sections for epiphany-genius:
 
 ---
 
-## Integration with epiphany-genius
+## Integration with Downstream Consumers
 
-**This skill prepares context. epiphany-genius reasons about it.**
+**This skill prepares context. Downstream consumers reason about it.**
 
 **Workflow:**
-1. User runs `/epiphany-context` with problem statement
-2. This skill gathers and structures context
-3. User runs `/epiphany-genius` with the structured context
-4. epiphany-genius applies its 5-phase reasoning pipeline
+1. User invokes the context-preparation step (this skill standalone, or its inlined equivalent inside a host skill) with a problem statement
+2. The Pipeline gathers and structures context
+3. The structured `<epiphany_context>` block is passed to a downstream brainstorming-class or reasoning-class consumer
+4. The downstream consumer applies its own pipeline to the structured context
 
 **Composition pattern:**
 
-Any skill can document: *"For complex problems requiring deep reasoning, run `/epiphany-context` first to gather context, then pass its output to `/epiphany-genius`."*
+Any skill can document: *"For complex problems requiring deep reasoning, gather context first using a context-preparation step (this skill or its inlined equivalent), then pass the structured `<epiphany_context>` output to your downstream consumer."*
 
 This is a convention, not runtime coupling:
-- epiphany-context does NOT import, reference, or modify any other skill
-- epiphany-genius does NOT require epiphany-context
+- This skill does NOT import, reference, or modify any other skill
+- Downstream consumers do NOT require this skill to exist as a standalone command at any specific path
 - The agent orchestrates the handoff in its own response flow
+
+**Two integration modes:**
+
+1. **Standalone**, where this skill is invoked separately and its output is passed by the agent to a downstream consumer
+2. **Inlined**, where the Hard Gates, Pipeline, three-category scope fence, and XML output contract are copy-pasted into the host skill's `SKILL.md` between the inlinable-block markers — making the host skill self-contained with no dependency on this skill being present
 
 ---
 
 ## Examples
+
+> **(illustrative — standalone-mode only)** The examples below reference specific projects and file paths to demonstrate the Pipeline in concrete form. They are not part of the inlinable contract — when inlining this Pipeline into another skill, omit or replace these examples with host-appropriate ones.
 
 ### Example 1: Code Analysis Request (Normal Mode)
 
@@ -436,3 +458,7 @@ V1 (Content Preservation), V2 (Knowledge & Claim), V3 (Logic Consistency), V4 (O
 - Makes constraints and assumptions explicit
 
 **If the input has no references to resolve, return it structured but unmodified.**
+
+<!-- END: inlinable block — everything between BEGIN and END is the self-contained pipeline that can be copy-pasted into another skill's SKILL.md. Sections marked "(standalone-mode only)" or "(illustrative)" should be omitted when inlining. -->
+
+> **Note on the Examples section above:** The Examples reference specific file paths (e.g. `PsycogVST/...`) for illustration only. They are standalone-mode demonstrations and should be omitted or replaced with host-appropriate examples when this Pipeline is inlined into another skill. The example content is not load-bearing for the Pipeline itself.
